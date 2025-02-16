@@ -1,242 +1,190 @@
-// Utility functions for text processing
-function chunkText(text, chunkSize = 5000) {
-    const chunks = [];
-    for (let i = 0; i < text.length; i += chunkSize) {
-        chunks.push(text.slice(i, i + chunkSize));
-    }
-    return chunks;
-}
-
-async function processLargeText(element, maxHeight = 3300) {
-    const style = window.getComputedStyle(element);
-    const lineHeight = parseInt(style.lineHeight);
-    const fontSize = parseInt(style.fontSize);
-    
-    const charsPerLine = Math.floor(element.offsetWidth / (fontSize * 0.6));
-    const linesPerPage = Math.floor(maxHeight / lineHeight);
-    const charsPerPage = charsPerLine * linesPerPage;
-    
-    return chunkText(element.innerText, charsPerPage);
-}
-
-// DOM Elements
-const textarea = document.getElementById('input-text');
-const preview = document.getElementById('preview');
-const fontButtons = document.querySelectorAll('.font-button');
-const textColor = document.getElementById('text-color');
-const fontSize = document.getElementById('font-size');
-const fontSizeValue = document.getElementById('font-size-value');
-const lineSpacing = document.getElementById('line-spacing');
-const lineSpacingValue = document.getElementById('line-spacing-value');
-const wordSpacing = document.getElementById('word-spacing');
-const wordSpacingValue = document.getElementById('word-spacing-value');
-const backgroundOptions = document.querySelectorAll('.background-option');
-const backgroundColorPicker = document.getElementById('background-color-picker');
-const downloadPdfButton = document.getElementById('download-pdf');
-const downloadImageButton = document.getElementById('download-image');
-const formatButtons = document.querySelectorAll('.format-button');
-const fontUpload = document.getElementById('font-upload');
-const templateSelector = document.getElementById('template-selector');
-
-// Templates data
-const templates = {
-    thankYouNote: "Dear [Name],\n\nThank you so much for your kindness and generosity. I am truly grateful.\n\nSincerely,\n[Your Name]",
-    businessLetter: "[Your Address]\n\n[Date]\n\n[Recipient's Name]\n[Recipient's Address]\n\nDear [Recipient's Name],\n\nI am writing to inquire about...\n\nBest regards,\n[Your Name]",
-    invitation: "You are cordially invited to celebrate [Event] with us.\n\nDate: [Date]\nTime: [Time]\nLocation: [Place]\n\nPlease RSVP by [Date]."
+// Add these page format constants
+const PAGE_FORMATS = {
+    A4: { width: 210, height: 297, margins: 15 }, // sizes in mm
+    LETTER: { width: 215.9, height: 279.4, margins: 15 },
+    LEGAL: { width: 215.9, height: 355.6, margins: 15 }
 };
 
-// Initial Setup
-preview.style.fontFamily = "'Caveat', cursive";
+// Add this utility function for page calculations
+function calculatePageDimensions(format = 'A4') {
+    const pageFormat = PAGE_FORMATS[format.toUpperCase()] || PAGE_FORMATS.A4;
+    return {
+        ...pageFormat,
+        contentWidth: pageFormat.width - (2 * pageFormat.margins),
+        contentHeight: pageFormat.height - (2 * pageFormat.margins)
+    };
+}
 
-// Event Listeners
-textarea.addEventListener('input', function() {
-    const text = this.value || 'Your handwritten text will appear here';
-    if (text.length > 5000) {
-        preview.innerHTML = '';
-        const chunks = chunkText(text);
-        chunks.forEach((chunk, index) => {
-            const pageDiv = document.createElement('div');
-            pageDiv.className = 'preview-page';
-            pageDiv.innerText = chunk;
-            if (index > 0) {
-                pageDiv.style.pageBreakBefore = 'always';
-            }
-            preview.appendChild(pageDiv);
-        });
-    } else {
-        preview.innerText = text;
+// Replace the existing preview update logic
+function updatePreview(text) {
+    if (!text) {
+        preview.innerHTML = '<div class="preview-page">Your handwritten text will appear here</div>';
+        return;
     }
-});
 
-// Font Selection Handler
-fontButtons.forEach(button => {
-    button.addEventListener('click', function() {
-        fontButtons.forEach(btn => btn.classList.remove('active'));
-        this.classList.add('active');
-        preview.style.fontFamily = this.dataset.font;
-    });
-});
+    const format = document.getElementById('page-format').value || 'A4';
+    const dimensions = calculatePageDimensions(format);
+    
+    // Calculate approximate characters per page (based on font size and page dimensions)
+    const style = window.getComputedStyle(preview);
+    const fontSize = parseInt(style.fontSize);
+    const lineHeight = parseInt(style.lineHeight);
+    
+    const charsPerLine = Math.floor((dimensions.contentWidth * 3.7794) / (fontSize * 0.6)); // Convert mm to px
+    const linesPerPage = Math.floor((dimensions.contentHeight * 3.7794) / lineHeight);
+    const charsPerPage = charsPerLine * linesPerPage;
 
-// Custom Font Upload Handler
-fontUpload.addEventListener('change', function() {
-    const file = this.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const fontData = e.target.result;
-            const font = new FontFace('CustomFont', fontData);
-            font.load().then(function(loadedFont) {
-                document.fonts.add(loadedFont);
-                preview.style.fontFamily = 'CustomFont';
-            }).catch(function(error) {
-                console.error('Font loading error:', error);
-                alert('Failed to load font.');
-            });
-        };
-        reader.readAsArrayBuffer(file);
+    // Split text into pages
+    const pages = [];
+    let remaining = text;
+    while (remaining.length > 0) {
+        const pageText = remaining.slice(0, charsPerPage);
+        pages.push(pageText);
+        remaining = remaining.slice(charsPerPage);
     }
-});
 
-// Text Color Handler
-textColor.addEventListener('input', function() {
-    preview.style.color = this.value;
-});
-
-// Font Size Handler
-fontSize.addEventListener('input', function() {
-    preview.style.fontSize = `${this.value}px`;
-    fontSizeValue.textContent = `${this.value}px`;
-});
-
-// Line Spacing Handler
-lineSpacing.addEventListener('input', function() {
-    preview.style.lineHeight = this.value;
-    lineSpacingValue.textContent = this.value;
-});
-
-// Word Spacing Handler
-wordSpacing.addEventListener('input', function() {
-    preview.style.wordSpacing = `${this.value}px`;
-    wordSpacingValue.textContent = `${this.value}px`;
-});
-
-// Background Options Handler
-backgroundOptions.forEach(option => {
-    option.addEventListener('click', function() {
-        backgroundOptions.forEach(opt => opt.classList.remove('active'));
-        this.classList.add('active');
-        backgroundColorPicker.value = '#ffffff';
-        const bgType = this.dataset.background;
-        switch(bgType) {
-            case 'white':
-                preview.style.backgroundColor = '#ffffff';
-                preview.style.backgroundImage = 'none';
-                break;
-            case 'lined':
-                preview.style.backgroundColor = '#ffffff';
-                preview.style.backgroundImage = "url('lined.png')";
-                break;
-            case 'grid':
-                preview.style.backgroundColor = '#ffffff';
-                preview.style.backgroundImage = "url('grid.png')";
-                break;
-        }
+    // Update preview with pages
+    preview.innerHTML = '';
+    pages.forEach((pageText, index) => {
+        const pageDiv = document.createElement('div');
+        pageDiv.className = 'preview-page';
+        pageDiv.style.width = `${dimensions.width * 3.7794}px`; // Convert mm to px
+        pageDiv.style.height = `${dimensions.height * 3.7794}px`;
+        pageDiv.style.padding = `${dimensions.margins * 3.7794}px`;
+        pageDiv.style.marginBottom = '20px';
+        pageDiv.style.border = '1px solid #ddd';
+        pageDiv.style.boxSizing = 'border-box';
+        pageDiv.style.backgroundColor = 'white';
+        pageDiv.style.position = 'relative';
+        pageDiv.innerText = pageText;
+        
+        // Add page number
+        const pageNumber = document.createElement('div');
+        pageNumber.style.position = 'absolute';
+        pageNumber.style.bottom = '10px';
+        pageNumber.style.right = '10px';
+        pageNumber.style.fontSize = '12px';
+        pageNumber.style.color = '#666';
+        pageNumber.innerText = `Page ${index + 1}`;
+        pageDiv.appendChild(pageNumber);
+        
+        preview.appendChild(pageDiv);
     });
-});
+}
 
-// Background Color Picker Handler
-backgroundColorPicker.addEventListener('input', function() {
-    backgroundOptions.forEach(opt => opt.classList.remove('active'));
-    preview.style.backgroundImage = 'none';
-    preview.style.backgroundColor = this.value;
-});
+// Add this to your HTML
+`<div class="control-group">
+    <label for="page-format">Page Format:</label>
+    <select id="page-format">
+        <option value="A4">A4</option>
+        <option value="LETTER">Letter</option>
+        <option value="LEGAL">Legal</option>
+    </select>
+</div>`
 
-// Formatting Buttons Handler
-formatButtons.forEach(button => {
-    button.addEventListener('click', function() {
-        const command = this.dataset.command;
-        let value = this.dataset.value || null;
-        if (command === 'hiliteColor' && !value) {
-            value = prompt('Enter a color name or hex code:', 'yellow');
-        }
-        document.execCommand(command, false, value);
-    });
-});
-
-// Template Selector Handler
-templateSelector.addEventListener('change', function() {
-    const template = templates[this.value];
-    if (template) {
-        textarea.value = template;
-        preview.innerText = template;
-    }
-});
-
-// PDF Download Handler
-downloadPdfButton.addEventListener('click', async () => {
+// Modified PDF generation code
+async function generatePDF() {
     try {
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const pages = await processLargeText(preview);
+        const format = document.getElementById('page-format').value || 'A4';
+        const dimensions = calculatePageDimensions(format);
+        
+        // Create PDF with proper format
+        const doc = new jsPDF({
+            format: format.toLowerCase(),
+            unit: 'mm'
+        });
+
+        // Get all preview pages
+        const pages = document.querySelectorAll('.preview-page');
         
         for (let i = 0; i < pages.length; i++) {
             if (i > 0) {
                 doc.addPage();
             }
+
+            const page = pages[i];
             
-            const pageElement = document.createElement('div');
-            pageElement.style.cssText = preview.style.cssText;
-            pageElement.style.width = preview.offsetWidth + 'px';
-            pageElement.innerText = pages[i];
-            
-            document.body.appendChild(pageElement);
-            
-            const canvas = await html2canvas(pageElement, {
-                backgroundColor: null,
+            // Create a temporary container for the current page
+            const container = document.createElement('div');
+            container.style.width = `${dimensions.width}mm`;
+            container.style.height = `${dimensions.height}mm`;
+            container.style.position = 'fixed';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.style.backgroundColor = 'white';
+            container.appendChild(page.cloneNode(true));
+            document.body.appendChild(container);
+
+            // Generate canvas for the page
+            const canvas = await html2canvas(container, {
                 scale: 2,
                 logging: false,
-                height: Math.min(pageElement.scrollHeight, 3300)
+                backgroundColor: null,
+                useCORS: true,
+                allowTaint: true
             });
-            
-            const imgData = canvas.toDataURL('image/png');
-            const imgProps = doc.getImageProperties(imgData);
-            const pdfWidth = doc.internal.pageSize.getWidth();
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-            
-            doc.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            document.body.removeChild(pageElement);
+
+            // Add image to PDF with proper margins
+            const imgData = canvas.toDataURL('image/jpeg', 0.92);
+            doc.addImage(
+                imgData,
+                'JPEG',
+                dimensions.margins,
+                dimensions.margins,
+                dimensions.contentWidth,
+                dimensions.contentHeight
+            );
+
+            // Clean up
+            document.body.removeChild(container);
         }
+
+        // Optimize PDF file size
+        const pdfBlob = doc.output('blob');
+        const compressedPdf = await compressPDF(pdfBlob);
         
-        doc.save('handwriting.pdf');
+        // Save the compressed PDF
+        const url = URL.createObjectURL(compressedPdf);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'handwriting.pdf';
+        link.click();
+        URL.revokeObjectURL(url);
     } catch (error) {
         console.error('PDF generation error:', error);
-        alert('Error generating PDF. Please try with a smaller text or fewer pages.');
+        alert('Error generating PDF. Please try again.');
     }
+}
+
+// PDF compression utility
+async function compressPDF(pdfBlob) {
+    const options = {
+        maxSize: 1000000, // 1MB target size
+        quality: 0.9
+    };
+    
+    if (pdfBlob.size <= options.maxSize) {
+        return pdfBlob;
+    }
+
+    const compressionRatio = options.maxSize / pdfBlob.size;
+    const newQuality = Math.min(options.quality, compressionRatio);
+    
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Re-compress the PDF with lower quality
+    return doc.output('blob', { quality: newQuality });
+}
+
+// Update event listeners
+document.getElementById('page-format').addEventListener('change', function() {
+    updatePreview(textarea.value);
 });
 
-// Image Download Handler
-downloadImageButton.addEventListener('click', async () => {
-    try {
-        const pages = await processLargeText(preview);
-        
-        if (pages.length > 1) {
-            alert('For long texts, please use the PDF download option instead.');
-            return;
-        }
-        
-        const canvas = await html2canvas(preview, {
-            backgroundColor: null,
-            scale: 2,
-            logging: false,
-            height: Math.min(preview.scrollHeight, 3300)
-        });
-
-        const link = document.createElement('a');
-        link.download = 'handwriting.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (error) {
-        console.error('Image generation error:', error);
-        alert('Error generating image. Please try with a smaller text.');
-    }
+textarea.addEventListener('input', function() {
+    updatePreview(this.value);
 });
+
+downloadPdfButton.addEventListener('click', generatePDF);
