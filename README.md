@@ -2,6 +2,10 @@
 
 Convert digital text into realistic handwriting-style text. This tool helps create a natural, handwritten appearance for your digital content.
 
+```
+[![Preview](preview.png)](https://youtu.be/RUiNi6av7fE?feature=shared)
+```
+
 ## Features
 
 - Convert plain text to handwriting-style text
@@ -17,9 +21,5 @@ Convert digital text into realistic handwriting-style text. This tool helps crea
 
 🔗 [Try Live Demo](https://amankumar0098.github.io/Text-to-Handwriting-Converter/)
 
-
-## License
-
-This project is licensed under the MIT License
 
 
