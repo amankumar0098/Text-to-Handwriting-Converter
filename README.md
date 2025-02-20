@@ -2,9 +2,7 @@
 
 Convert digital text into realistic handwriting-style text. This tool helps create a natural, handwritten appearance for your digital content.
 
-```
 [![Preview](preview.png)](https://youtu.be/RUiNi6av7fE?feature=shared)
-```
 
 ## Features
 
